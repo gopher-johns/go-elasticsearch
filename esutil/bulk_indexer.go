@@ -423,6 +423,14 @@ func (w *worker) writeBody(item BulkIndexerItem) error {
 	return nil
 }
 
+func (w *worker) propagateFlushError(ctx context.Context, err error) {
+	for _, item := range w.items {
+		if item.OnFailure != nil {
+			item.OnFailure(ctx, item, BulkIndexerResponseItem{}, err)
+		}
+	}
+}
+
 // flush writes out the worker buffer; it must be called under a lock.
 //
 func (w *worker) flush(ctx context.Context) error {
@@ -481,6 +489,7 @@ func (w *worker) flush(ctx context.Context) error {
 		if w.bi.config.OnError != nil {
 			w.bi.config.OnError(ctx, fmt.Errorf("flush: %s", err))
 		}
+		w.propagateFlushError(ctx, err)
 		return fmt.Errorf("flush: %s", err)
 	}
 	if res.Body != nil {
@@ -492,6 +501,7 @@ func (w *worker) flush(ctx context.Context) error {
 		if w.bi.config.OnError != nil {
 			w.bi.config.OnError(ctx, fmt.Errorf("flush: %s", err))
 		}
+		w.propagateFlushError(ctx, err)
 		return fmt.Errorf("flush: %s", res.String())
 	}
 
@@ -500,6 +510,7 @@ func (w *worker) flush(ctx context.Context) error {
 		if w.bi.config.OnError != nil {
 			w.bi.config.OnError(ctx, fmt.Errorf("flush: %s", err))
 		}
+		w.propagateFlushError(ctx, err)
 		return fmt.Errorf("flush: error parsing response body: %s", err)
 	}
 
